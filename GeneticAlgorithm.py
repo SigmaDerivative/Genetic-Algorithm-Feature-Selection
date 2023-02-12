@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from LinReg import LinReg
+
 # CONFIG
 POPULATION_SIZE = 100
 NUM_EPISODES = 1000
@@ -10,8 +12,14 @@ MUTATE_MIN = 0
 MUTATE_MAX = 7
 GENOME_MUTATE_CHANCE = 0.2
 
+TASK = "g"
+if TASK == "g":
+    BITSTRING_SIZE = 101
+
 # solution/fitness
 sine = np.sin(np.arange(0, 128))
+linreg = LinReg()
+data = np.loadtxt("14317816.txt", delimiter=",", encoding="UTF-8", dtype=float)
 
 
 class Candidate:
@@ -33,10 +41,18 @@ class Candidate:
 
     def evaluate(self) -> float:
         # set fitness attribute
-        fitness = sine[self.get_solution()]
+        if TASK == "a":
+            fitness = sine[self.get_solution()]
         # f)
-        if not 4 < self.get_solution() < 11:
-            fitness -= 1
+        elif TASK == "f":
+            if not 4 < self.get_solution() < 11:
+                fitness = sine[self.get_solution()]
+                fitness -= 1
+
+        # g)
+        elif TASK == "g":
+            columns = linreg.get_columns(X=data, bitstring=self.bitstring)
+            fitness = linreg.get_fitness(x=columns, y=data[:, -1])
         self.fitness = fitness
 
     def mutate(
@@ -61,13 +77,16 @@ def create_population(size) -> list[Candidate]:
     return [Candidate() for _ in range(size)]
 
 
-def parent_selection(population: list[Candidate], best: bool = True) -> None:
+def parent_selection(population: list[Candidate]) -> None:
     # sort population
-    population.sort(key=lambda x: x.fitness, reverse=True)
-    if best:
-        return population[:2]
-    # random
-    return np.random.choice(population, 2, replace=False)
+    if TASK == "g":
+        # get the worst
+        population.sort(key=lambda x: x.fitness)
+    else:
+        # get the best
+        population.sort(key=lambda x: x.fitness, reverse=True)
+    # return the two first
+    return population[:2]
 
 
 def crossover(pair: np.ndarray[Candidate]) -> np.ndarray[Candidate]:
@@ -97,7 +116,12 @@ def crossover(pair: np.ndarray[Candidate]) -> np.ndarray[Candidate]:
 
 def tournament(population: list[Candidate]) -> list[Candidate]:
     # sort population
-    population.sort(key=lambda x: x.fitness)
+    if TASK == "g":
+        # the worst survive
+        population.sort(key=lambda x: x.fitness, reverse=True)
+    else:
+        # the best survive
+        population.sort(key=lambda x: x.fitness)
 
     # return survivors
     return population[2:]
@@ -117,7 +141,7 @@ def run():
         average_fitnesses.append(average_fitness)
 
         # select best pair
-        parents = parent_selection(population=population, best=True)
+        parents = parent_selection(population=population)
 
         # perform crossover to get children
         children = crossover(parents)
@@ -128,15 +152,27 @@ def run():
         # update population
         population = np.append(survivors, children).tolist()
 
-    plt.plot(np.arange(128), sine)
-    fits = []
-    for i in population:
-        plt.scatter(i.get_solution(), i.fitness, c="r")
-        fits.append(i.fitness)
-    fits.sort()
-    print(fits)
+    if TASK == "g":
+        plt.plot(
+            np.arange(NUM_EPISODES), average_fitnesses, label="RMSE feature selected"
+        )
+        plt.plot(
+            np.arange(NUM_EPISODES),
+            np.ones(NUM_EPISODES) * linreg.get_fitness(data[:, :101], data[:, -1]),
+            c="r",
+            label="base RMSE",
+        )
+        plt.plot(
+            np.arange(NUM_EPISODES), np.ones(NUM_EPISODES) * 0.124, c="g", label="0.124"
+        )
+        plt.legend()
+    else:
+        plt.plot(np.arange(128), sine)
+        for i in population:
+            plt.scatter(i.get_solution(), i.fitness, c="r")
     plt.show()
 
 
 if __name__ == "__main__":
     run()
+    # print("hello")
