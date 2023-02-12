@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 # CONFIG
 POPULATION_SIZE = 100
-NUM_EPISODES = 1000
+NUM_EPISODES = 100
 BITSTRING_SIZE = 7
 
 MUTATE_MIN = 0
@@ -18,7 +18,7 @@ class Candidate:
     def __init__(self) -> None:
         # inverse binary repr
         self.bitstring: np.ndarray[int] = np.random.randint(0, 2, BITSTRING_SIZE)
-        self.fitness: int = -1
+        self.evaluate()
 
     def get_solution(self) -> int:
         """Gives the integer representation of the bitstring
@@ -32,9 +32,8 @@ class Candidate:
         return int(num)
 
     def evaluate(self) -> float:
-        fitness = sine[self.get_solution()]
-        self.fitness = fitness
-        return fitness
+        # set fitness attribute
+        self.fitness = sine[self.get_solution()]
 
     def mutate(
         self,
@@ -56,15 +55,6 @@ class Candidate:
 
 def create_population(size) -> list[Candidate]:
     return [Candidate() for _ in range(size)]
-
-
-def evaluate_population(population: list[Candidate]) -> float:
-    # evaluate population
-    fitnesses = []
-    for candidate in population:
-        fitnesses.append(candidate.evaluate())
-    # return mean
-    return np.mean(fitnesses)
 
 
 def parent_selection(population: list[Candidate], best: bool = True) -> None:
@@ -95,8 +85,6 @@ def crossover(pair: np.ndarray[Candidate]) -> np.ndarray[Candidate]:
     if np.random.uniform() > 0.5:
         child2.mutate()
 
-    # print(child1.evaluate())
-
     return np.array([child1, child2])
 
 
@@ -109,16 +97,13 @@ def tournament(population: list[Candidate]) -> list[Candidate]:
 
 
 def run():
-
     # create population
     population = create_population(POPULATION_SIZE)
 
     average_fitnesses = []
 
     for episode in range(NUM_EPISODES):
-        # rank population and get average fitness
-        average_fitness = evaluate_population(population=population)
-
+        average_fitness = np.mean(np.array([x.fitness for x in population]))
         # display average fitness
         print(episode, "average", average_fitness)
         # append to list for plotting
@@ -136,7 +121,6 @@ def run():
         # update population
         population = np.append(survivors, children).tolist()
 
-    # print(num_episodes)
     plt.plot(np.arange(NUM_EPISODES), average_fitnesses)
     plt.show()
 
