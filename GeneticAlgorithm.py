@@ -5,12 +5,12 @@ from LinReg import LinReg
 
 # CONFIG
 POPULATION_SIZE = 100
-NUM_EPISODES = 1000
+NUM_EPISODES = 100
 BITSTRING_SIZE = 7
 
 MUTATE_MIN = 0
 MUTATE_MAX = 7
-GENOME_MUTATE_CHANCE = 0.2
+GENOME_MUTATE_CHANCE = 0.4
 
 TASK = "g"
 if TASK == "g":
@@ -77,7 +77,7 @@ def create_population(size) -> list[Candidate]:
     return [Candidate() for _ in range(size)]
 
 
-def parent_selection(population: list[Candidate]) -> None:
+def parent_selection(population: list[Candidate], num_parents: int = 2) -> None:
     # sort population
     if TASK == "g":
         # get the worst
@@ -86,10 +86,42 @@ def parent_selection(population: list[Candidate]) -> None:
         # get the best
         population.sort(key=lambda x: x.fitness, reverse=True)
     # return the two first
-    return population[:2]
+    return population[:num_parents]
 
 
-def crossover(pair: np.ndarray[Candidate]) -> np.ndarray[Candidate]:
+def crossover(
+    parents: np.ndarray[Candidate],
+    num_children: int = 2,
+    deterministic: bool = False,
+    ranked: bool = True,
+) -> np.ndarray[Candidate]:
+
+    children = np.array([])
+
+    if deterministic and num_children > len(parents):
+        raise ValueError(
+            "Cannot choose determinisitc parents to create more children than parents"
+        )
+    elif deterministic:
+        for idx in range(int(len(parents) / 2)):
+            pair = np.array([parents[idx * 2], parents[idx * 2 + 1]])
+            children = np.append(children, mate(pair))
+    else:
+        for _ in range(int(num_children / 2)):
+            if ranked:
+                prob = np.array([x.fitness + 1 for x in parents])
+                prob = prob / np.sum(prob)
+                pair = np.random.choice(parents, 2, replace=False, p=prob)
+            else:
+                pair = np.random.choice(parents, 2, replace=False)
+            children = np.append(children, mate(pair))
+
+    return children
+
+
+def mate(
+    pair: np.ndarray[Candidate], mutate_chance: float = 0.5
+) -> np.ndarray[Candidate]:
     # find point to split where to get dna from parents
     split_index = np.random.randint(1, BITSTRING_SIZE - 1)
     # create child1 and insert dna
@@ -103,28 +135,30 @@ def crossover(pair: np.ndarray[Candidate]) -> np.ndarray[Candidate]:
         pair[1].bitstring[:split_index], pair[0].bitstring[split_index:]
     )
     # mutate children
-    if np.random.uniform() > 0.5:
+    if np.random.uniform() < mutate_chance:
         child1.mutate()
-    if np.random.uniform() > 0.5:
+    if np.random.uniform() < mutate_chance:
         child2.mutate()
 
     child1.evaluate()
     child2.evaluate()
 
-    return np.array([child1, child2])
+    children = np.array([child1, child2])
+
+    return children
 
 
-def tournament(population: list[Candidate]) -> list[Candidate]:
+def tournament(population: list[Candidate], pop_size: int) -> list[Candidate]:
     # sort population
     if TASK == "g":
         # the worst survive
-        population.sort(key=lambda x: x.fitness, reverse=True)
+        population.sort(key=lambda x: x.fitness)
     else:
         # the best survive
-        population.sort(key=lambda x: x.fitness)
+        population.sort(key=lambda x: x.fitness, reverse=True)
 
     # return survivors
-    return population[2:]
+    return population[:pop_size]
 
 
 def run():
@@ -140,17 +174,22 @@ def run():
         # append to list for plotting
         average_fitnesses.append(average_fitness)
 
-        # select best pair
-        parents = parent_selection(population=population)
+        # select best parents
+        parents = parent_selection(population=population, num_parents=70)
 
         # perform crossover to get children
-        children = crossover(parents)
+        children = crossover(
+            parents, num_children=100, deterministic=False, ranked=True
+        )
 
         # get survivors
-        survivors = tournament(population=population)
+        survivors = tournament(
+            population=np.append(population, children).tolist(),
+            pop_size=POPULATION_SIZE,
+        )
 
         # update population
-        population = np.append(survivors, children).tolist()
+        population = survivors
 
     if TASK == "g":
         plt.plot(
