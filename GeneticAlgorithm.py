@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 # CONFIG
 POPULATION_SIZE = 100
-NUM_EPISODES = 100
+NUM_EPISODES = 1000
 BITSTRING_SIZE = 7
 
 MUTATE_MIN = 0
@@ -33,7 +33,11 @@ class Candidate:
 
     def evaluate(self) -> float:
         # set fitness attribute
-        self.fitness = sine[self.get_solution()]
+        fitness = sine[self.get_solution()]
+        # f)
+        if not 4 < self.get_solution() < 11:
+            fitness -= 1
+        self.fitness = fitness
 
     def mutate(
         self,
@@ -85,6 +89,9 @@ def crossover(pair: np.ndarray[Candidate]) -> np.ndarray[Candidate]:
     if np.random.uniform() > 0.5:
         child2.mutate()
 
+    child1.evaluate()
+    child2.evaluate()
+
     return np.array([child1, child2])
 
 
@@ -121,7 +128,13 @@ def run():
         # update population
         population = np.append(survivors, children).tolist()
 
-    plt.plot(np.arange(NUM_EPISODES), average_fitnesses)
+    plt.plot(np.arange(128), sine)
+    fits = []
+    for i in population:
+        plt.scatter(i.get_solution(), i.fitness, c="r")
+        fits.append(i.fitness)
+    fits.sort()
+    print(fits)
     plt.show()
 
 
