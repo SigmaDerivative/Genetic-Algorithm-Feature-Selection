@@ -178,11 +178,27 @@ def crowding_tournament(
         c1 = children[idx * 2]
         c2 = children[idx * 2 + 1]
 
-        diff_p1_c1 = p1.bitstring - c1.bitstring
-        diff_p1_c2 = p1.bitstring - c2.bitstring
-        pair = np.argmin(diff_p1_c1, diff_p1_c2)
+        # get least diff child to parent 1
+        diff_p1_c1 = np.sum(p1.bitstring - c1.bitstring)
+        diff_p1_c2 = np.sum(p1.bitstring - c2.bitstring)
+        pair_idx = int(np.argmin([diff_p1_c1, diff_p1_c2]))
+        # insert the winner from duels into winner list
+        winners = np.append(winners, duel(p1, children[idx * 2 + pair_idx], task=task))
+        winners = np.append(
+            winners, duel(p2, children[idx * 2 + (1 - pair_idx)], task=task)
+        )
 
-    return winners
+    return winners.tolist()
+
+
+def duel(can1: Candidate, can2: Candidate, task: str) -> Candidate:
+    if can1.fitness > can2.fitness:
+        if task == "g":
+            return can2
+        return can1
+    if task == "g":
+        return can1
+    return can2
 
 
 def plot(task: str, name: str, num_ep: int, avg_fit: list[float], pop: list[Candidate]):
@@ -255,7 +271,6 @@ def run(
         print(episode, "average", average_fitness)
         # append to list for plotting
         average_fitnesses.append(average_fitness)
-
         # select best parents
         parents = parent_selection(
             population=population, num_parents=num_parents, task=task
@@ -271,7 +286,7 @@ def run(
                 task=task,
             )
 
-            survivors = crowding_tournament(parents, children)
+            survivors = crowding_tournament(parents, children, task)
         else:
             # perform crossover to get children
             children = crossover(
@@ -298,26 +313,28 @@ def run(
         if (episode + 1) % plot_ep == 0:
             plot(
                 task=task,
-                name=f"plots/{episode}.png",
+                name=f"plots/{task}-{crowding}.png"
+                if task == "g"
+                else f"plots/{episode}-{task}-{crowding}.png",
                 num_ep=episode + 1,
                 avg_fit=average_fitnesses,
                 pop=population,
             )
             plot_entropy(
-                name=f"plots/entropy-{episode}-{task}.png",
+                name=f"plots/entropy-{task}-{crowding}.png",
                 num_ep=episode + 1,
                 entropies=entropies,
             )
 
     plot(
         task=task,
-        name=f"plots/finished-{task}.png",
+        name=f"plots/{task}-{crowding}.png",
         num_ep=num_ep,
         avg_fit=average_fitnesses,
         pop=population,
     )
     plot_entropy(
-        name=f"plots/finished-entropy-{task}.png",
+        name=f"plots/entropy-{task}-{crowding}.png",
         num_ep=num_ep,
         entropies=entropies,
     )
@@ -335,7 +352,7 @@ if __name__ == "__main__":
     # MUTATE_MAX = 7
     # GENOME_MUTATE_CHANCE = 0.4
 
-    TASK = "f"  # a,f,g
+    TASK = "g"  # a,f,g
     if TASK == "g":
         BITSTRING_SIZE = 101
 
@@ -349,4 +366,5 @@ if __name__ == "__main__":
         num_children=50,
         deterministic=False,
         ranked=True,
+        crowding=True,
     )
